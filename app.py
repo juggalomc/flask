@@ -8,6 +8,43 @@ from ta.momentum import RSIIndicator
 from ta.volatility import BollingerBands
 from sklearn.ensemble import RandomForestRegressor
 import warnings
+from datetime import datetime, timedelta
+import numpy as np
+
+app = Flask(__name__)
+bot = StockAnalysisBot()
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        symbol = request.form.get("symbol").upper().strip()
+        df = bot.get_data(symbol, timeframe="5m", days=5)
+        if df is not None:
+            df = bot.calculate_technical_indicators(df)
+            fib = bot.calculate_fibonacci_levels(df)
+            momentum = bot.calculate_momentum(df)
+            trend = bot.predict_trend(df)
+            entry_exit = bot.calculate_entry_exit(df, fib, df["close"].iloc[-1], df["close"].std())
+            targets = bot.calculate_targets(df, fib, trend)
+            pattern = bot.generate_trade_pattern(df, targets, momentum, trend, entry_exit)
+
+            return render_template(
+                "results.html",
+                symbol=symbol,
+                fib=fib,
+                momentum=momentum,
+                trend=trend,
+                entry_exit=entry_exit,
+                targets=targets,
+                pattern=pattern,
+            )
+        else:
+            return render_template("index.html", error="Invalid symbol or no data available.")
+
+    return render_template("index.html")
+
+
+
 warnings.filterwarnings('ignore')
 
 class StockAnalysisBot:
