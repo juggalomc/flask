@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Analysis Results</title>
+</head>
+<body>
+    <h1>Analysis for {{ symbol }}</h1>
+    <h2>Fibonacci Levels</h2>
+    <ul>
+        {% for level, price in fib.items() %}
+            <li>{{ level }}: ${{ price|round(2) }}</li>
+        {% endfor %}
+    </ul>
+    <h2>Momentum</h2>
+    <ul>
+        {% for key, value in momentum.items() %}
+            <li>{{ key }}: {{ value|round(2) }}%</li>
+        {% endfor %}
+    </ul>
+    <h2>Trend Prediction</h2>
+    <p>Predicted Price: ${{ trend.predicted_price|round(2) }}</p>
+    <p>Expected Change: {{ trend.expected_change|round(2) }}%</p>
+    <a href="/">Back</a>
+</body>
+</html>
