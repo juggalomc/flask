@@ -11,40 +11,49 @@ import warnings
 from datetime import datetime, timedelta
 import numpy as np
 
+# Initialize Flask app
 app = Flask(__name__)
 bot = StockAnalysisBot()
 
+# Flask route for home page and form submission
 @app.route("/", methods=["GET", "POST"])
 def index():
+    print("Received request:", request.method)
     if request.method == "POST":
-        symbol = request.form.get("symbol").upper().strip()
-        df = bot.get_data(symbol, timeframe="5m", days=5)
-        if df is not None:
-            df = bot.calculate_technical_indicators(df)
-            fib = bot.calculate_fibonacci_levels(df)
-            momentum = bot.calculate_momentum(df)
-            trend = bot.predict_trend(df)
-            entry_exit = bot.calculate_entry_exit(df, fib, df["close"].iloc[-1], df["close"].std())
-            targets = bot.calculate_targets(df, fib, trend)
-            pattern = bot.generate_trade_pattern(df, targets, momentum, trend, entry_exit)
-
-            return render_template(
-                "results.html",
-                symbol=symbol,
-                fib=fib,
-                momentum=momentum,
-                trend=trend,
-                entry_exit=entry_exit,
-                targets=targets,
-                pattern=pattern,
-            )
-        else:
-            return render_template("index.html", error="Invalid symbol or no data available.")
-
+        try:
+            symbol = request.form.get("symbol").upper().strip()
+            print(f"Symbol entered: {symbol}")
+            df = bot.get_data(symbol, timeframe="5m", days=5)
+            print(f"Data fetched: {df is not None}")
+            if df is not None and not df.empty:
+                df = bot.calculate_technical_indicators(df)
+                fib = bot.calculate_fibonacci_levels(df)
+                momentum = bot.calculate_momentum(df)
+                trend = bot.predict_trend(df) or {'predicted_price': df['close'].iloc[-1], 'expected_change': 0}
+                entry_exit = bot.calculate_entry_exit(df, fib, df["close"].iloc[-1], df["close"].std())
+                targets = bot.calculate_targets(df, fib, trend)
+                pattern = bot.generate_trade_pattern(df, targets, momentum, trend, entry_exit)
+                print("Rendering results.html")
+                return render_template(
+                    "results.html",
+                    symbol=symbol,
+                    fib=fib,
+                    momentum=momentum,
+                    trend=trend,
+                    entry_exit=entry_exit,
+                    targets=targets,
+                    pattern=pattern,
+                )
+            else:
+                print("Rendering index.html with error: Invalid symbol or no data")
+                return render_template("index.html", error="Invalid symbol or no data available.")
+        except Exception as e:
+            print(f"Error in index route: {e}")
+            return render_template("index.html", error=f"Error processing request: {str(e)}")
+    print("Rendering index.html (GET)")
     return render_template("index.html")
 
-
-
+# Suppress warnings
 warnings.filterwarnings('ignore')
 
 class StockAnalysisBot:
@@ -60,6 +69,7 @@ class StockAnalysisBot:
 
     def get_data(self, symbol, timeframe="5m", limit=None, days=None):
         """Fetch historical price data using yfinance."""
+        print(f"Fetching data for {symbol}, timeframe: {timeframe}, days: {days}")
         try:
             ticker = yf.Ticker(symbol)
             if days:
@@ -70,11 +80,10 @@ class StockAnalysisBot:
                 df = ticker.history(period="7d", interval="5m")
                 if limit:
                     df = df.tail(limit)
-                    
+            print(f"Data fetched: {len(df)} rows")
             if df.empty or "Close" not in df.columns:
                 print(f"{datetime.now()}: {symbol} - Empty or invalid data.")
                 return None
-                
             df = df.rename(columns={"Close": "close", "High": "high", "Low": "low", "Open": "open"})
             return df
         except Exception as e:
@@ -122,16 +131,17 @@ class StockAnalysisBot:
         momentum_scores = {}
         for period in periods:
             returns = df['close'].pct_change(periods=period)
-            momentum_scores[f'{period}d'] = returns.iloc[-1] * 100
-            momentum_scores[f'{period}d_avg'] = returns.mean() * 100
-            momentum_scores[f'{period}d_vol'] = returns.std() * 100
+            momentum_scores[f'{period}d'] = returns.iloc[-1] * 100 if not pd.isna(returns.iloc[-1]) else 0
+            momentum_scores[f'{period}d_avg'] = returns.mean() * 100 if not pd.isna(returns.mean()) else 0
+            momentum_scores[f'{period}d_vol'] = returns.std() * 100 if not pd.isna(returns.std()) else 0
         return momentum_scores
 
     def predict_trend(self, df):
         """Use Random Forest to predict short-term trend."""
         features = df[['close', 'rsi', 'macd', 'macd_signal', 'bb_upper', 'bb_lower', 'sma20', 'sma50']].dropna()
         if len(features) < 20:
-            return None
+            print("Insufficient data for trend prediction")
+            return {'predicted_price': df['close'].iloc[-1], 'expected_change': 0}
             
         X = features[:-1]
         y = features['close'].shift(-1)[:-1]
@@ -203,7 +213,7 @@ class StockAnalysisBot:
         """Generate logical trade pattern for the next 5 days."""
         trade_pattern = []
         current_price = df['close'].iloc[-1]
-        volatility = df['close'].pct_change().std() * np.sqrt(252)
+        volatility = df['close'].pct_change().std() * np.sqrt(252) if not pd.isna(df['close'].pct_change().std()) else 0.01
         trend_strength = trend_prediction['expected_change'] if trend_prediction else 0
         
         for day in range(1, 6):
@@ -217,7 +227,7 @@ class StockAnalysisBot:
             }
             
             # Adjust momentum and volatility for each day
-            daily_momentum = momentum['5d'] / 5 * day
+            daily_momentum = momentum['5d'] / 5 * day if '5d' in momentum else 0
             expected_move = current_price * (1 + daily_momentum / 100 + volatility / np.sqrt(252))
             
             # Bullish scenario
@@ -263,7 +273,7 @@ class StockAnalysisBot:
     def calculate_targets(self, df, fib_levels, trend_prediction):
         """Calculate precise price targets and expected dates."""
         current_price = df['close'].iloc[-1]
-        volatility = df['close'].pct_change().std() * np.sqrt(252)
+        volatility = df['close'].pct_change().std() * np.sqrt(252) if not pd.isna(df['close'].pct_change().std()) else 0.01
         
         targets = {
             'bullish': {},
@@ -321,7 +331,7 @@ class StockAnalysisBot:
         targets = self.calculate_targets(df_1d, fib_levels, trend_prediction)
         
         current_price = df_5m['close'].iloc[-1]
-        volatility = df_1d['close'].pct_change().std() * np.sqrt(252)
+        volatility = df_1d['close'].pct_change().std() * np.sqrt(252) if not pd.isna(df_1d['close'].pct_change().std()) else 0.01
         entry_exit = self.calculate_entry_exit(df_5m, fib_levels, current_price, volatility)
         trade_pattern = self.generate_trade_pattern(df_1d, targets, momentum, trend_prediction, entry_exit)
         
@@ -401,6 +411,8 @@ class StockAnalysisBot:
             print(f"Predicted Price: ${report['trend_prediction']['predicted_price']:.2f}")
             print(f"Expected Change: {report['trend_prediction']['expected_change']:.2f}%")
 
+# Commented out console-based main function to focus on Flask
+"""
 def main():
     bot = StockAnalysisBot()
     while True:
@@ -409,6 +421,8 @@ def main():
             break
         report = bot.analyze_stock(symbol)
         bot.print_report(report)
+"""
 
+# Run Flask app
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
