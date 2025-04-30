@@ -5,21 +5,60 @@
 </head>
 <body>
     <h1>Analysis for {{ symbol }}</h1>
+    
     <h2>Fibonacci Levels</h2>
     <ul>
         {% for level, price in fib.items() %}
             <li>{{ level }}: ${{ price|round(2) }}</li>
         {% endfor %}
     </ul>
+    
     <h2>Momentum</h2>
     <ul>
         {% for key, value in momentum.items() %}
             <li>{{ key }}: {{ value|round(2) }}%</li>
         {% endfor %}
     </ul>
+    
     <h2>Trend Prediction</h2>
     <p>Predicted Price: ${{ trend.predicted_price|round(2) }}</p>
     <p>Expected Change: {{ trend.expected_change|round(2) }}%</p>
+    
+    <h2>Entry and Exit Strategy</h2>
+    <p>Entry Price: ${{ entry_exit.entry.price|round(2) }} (Confidence: {{ (entry_exit.entry.confidence * 100)|round(1) }}%)</p>
+    <p>Primary Exit Price: ${{ entry_exit.exit.primary.price|round(2) }} (Probability: {{ (entry_exit.exit.primary.probability * 100)|round(1) }}%)</p>
+    <p>Secondary Exit Price: ${{ entry_exit.exit.secondary.price|round(2) }} (Probability: {{ (entry_exit.exit.secondary.probability * 100)|round(1) }}%)</p>
+    <p>Stop Loss: ${{ entry_exit.stop_loss|round(2) }}</p>
+    <p>Risk-Reward Ratio: {{ entry_exit.risk_reward|round(2) if entry_exit.risk_reward else 'N/A' }}</p>
+    
+    <h2>Price Targets</h2>
+    <h3>Bullish</h3>
+    <ul>
+        {% for level, data in targets.bullish.items() %}
+            <li>{{ level }}: ${{ data.price|round(2) }} (Probability: {{ (data.probability * 100)|round(1) }}%, Expected: {{ data.expected_days }} days)</li>
+        {% endfor %}
+    </ul>
+    <h3>Bearish</h3>
+    <ul>
+        {% for level, data in targets.bearish.items() %}
+            <li>{{ level }}: ${{ data.price|round(2) }} (Probability: {{ (data.probability * 100)|round(1) }}%, Expected: {{ data.expected_days }} days)</li>
+        {% endfor %}
+    </ul>
+    
+    <h2>5-Day Trade Pattern</h2>
+    {% for day in pattern %}
+        <h3>Day {{ day.day }} ({{ day.date }})</h3>
+        <p>Action: {{ day.action|capitalize }}</p>
+        <p>Target Price: ${{ day.target_price|round(2) if day.target_price else 'N/A' }}</p>
+        <p>Stop Loss: ${{ day.stop_loss|round(2) }}</p>
+        <p>Conditions:</p>
+        <ul>
+            {% for condition in day.conditions %}
+                <li>{{ condition }}</li>
+            {% endfor %}
+        </ul>
+    {% endfor %}
+    
     <a href="/">Back</a>
 </body>
 </html>
