@@ -1,21 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Stock Analyzer</title>
+    <title>Stock Analysis Bot</title>
 </head>
 <body>
-    <h1>Stock Prediction Bot</h1>
-    <form method="POST">
+    <h1>Stock Analysis Bot</h1>
+    <form method="POST" action="/">
         <label for="symbol">Enter Stock Symbol:</label>
-        <input type="text" name="symbol" required>
-        <input type="submit" value="Analyze">
+        <input type="text" id="symbol" name="symbol" required>
+        <button type="submit">Analyze</button>
     </form>
-
-    {% if signal %}
-        <h2>Signal: {{ signal }}</h2>
-    {% endif %}
     {% if error %}
-        <p style="color: red;">Error: {{ error }}</p>
+        <p style="color: red;">{{ error }}</p>
     {% endif %}
 </body>
 </html>
