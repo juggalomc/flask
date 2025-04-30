@@ -2,7 +2,6 @@ from flask import Flask, render_template, request
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
-import talib
 from sklearn.linear_model import LogisticRegression
 
 app = Flask(__name__)
