@@ -3,57 +3,45 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 from sklearn.linear_model import LogisticRegression
+from bot import StockAnalysisBot  # Assuming your class is in bot.py
+import os
 
 app = Flask(__name__)
 
-def analyze_stock(symbol):
-    try:
-        # Fetch data
-        end_date = datetime.today()
-        start_date = end_date - timedelta(days=365)
-        df = yf.download(symbol, start=start_date, end=end_date)
+bot = StockAnalysisBot()
 
-        if df.empty:
-            return None, "No data found."
-
-        # Indicators
-        df['SMA'] = talib.SMA(df['Close'], timeperiod=14)
-        df['RSI'] = talib.RSI(df['Close'], timeperiod=14)
-        macd, macdsignal, _ = talib.MACD(df['Close'], fastperiod=12, slowperiod=26, signalperiod=9)
-        df['MACD'] = macd
-        df['MACD_Signal'] = macdsignal
-
-        df.dropna(inplace=True)
-
-        # ML features
-        df['Return'] = df['Close'].pct_change()
-        df['Target'] = df['Return'].shift(-1).apply(lambda x: 1 if x > 0 else 0)
-        df.dropna(inplace=True)
-
-        features = df[['SMA', 'RSI', 'MACD', 'MACD_Signal']]
-        target = df['Target']
-
-        model = LogisticRegression()
-        model.fit(features, target)
-
-        latest_data = df.iloc[-1][['SMA', 'RSI', 'MACD', 'MACD_Signal']]
-        prediction = model.predict([latest_data])[0]
-
-        return "BUY" if prediction == 1 else "SELL", None
-
-    except Exception as e:
-        return None, str(e)
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    signal = None
+    result = None
     error = None
+    if request.method == "POST":
+        symbol = request.form.get("symbol", "").upper().strip()
+        if not symbol:
+            error = "Please enter a stock symbol."
+        else:
+            df = bot.get_data(symbol, days=bot.HISTORICAL_DAYS)
+            if df is None or df.empty:
+                error = f"No data found for symbol: {symbol}"
+            else:
+                try:
+                    df = bot.calculate_technical_indicators(df)
+                    fib = bot.calculate_fibonacci_levels(df)
+                    momentum = bot.calculate_momentum(df)
+                    trend = bot.predict_trend(df)
+                    entry_exit = bot.calculate_entry_exit(df, fib, df['close'].iloc[-1], df['close'].pct_change().std())
+                    targets = {'bullish': fib, 'bearish': fib}  # Placeholder for now, could expand
+                    pattern = bot.generate_trade_pattern(df, targets, momentum, trend, entry_exit)
 
-    if request.method == 'POST':
-        symbol = request.form['symbol']
-        signal, error = analyze_stock(symbol)
+                    result = {
+                        'symbol': symbol,
+                        'momentum': momentum,
+                        'trend': trend,
+                        'entry_exit': entry_exit,
+                        'pattern': pattern
+                    }
+                except Exception as e:
+                    error = f"Error processing data: {e}"
+    return render_template("index.html", result=result, error=error)
 
-    return render_template('index.html', signal=signal, error=error)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
