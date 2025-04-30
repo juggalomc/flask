@@ -11,51 +11,10 @@ import warnings
 from datetime import datetime, timedelta
 import numpy as np
 
-# Initialize Flask app
-app = Flask(__name__)
-bot = StockAnalysisBot()
-
-# Flask route for home page and form submission
-@app.route("/", methods=["GET", "POST"])
-def index():
-    print("Received request:", request.method)
-    if request.method == "POST":
-        try:
-            symbol = request.form.get("symbol").upper().strip()
-            print(f"Symbol entered: {symbol}")
-            df = bot.get_data(symbol, timeframe="5m", days=5)
-            print(f"Data fetched: {df is not None}")
-            if df is not None and not df.empty:
-                df = bot.calculate_technical_indicators(df)
-                fib = bot.calculate_fibonacci_levels(df)
-                momentum = bot.calculate_momentum(df)
-                trend = bot.predict_trend(df) or {'predicted_price': df['close'].iloc[-1], 'expected_change': 0}
-                entry_exit = bot.calculate_entry_exit(df, fib, df["close"].iloc[-1], df["close"].std())
-                targets = bot.calculate_targets(df, fib, trend)
-                pattern = bot.generate_trade_pattern(df, targets, momentum, trend, entry_exit)
-                print("Rendering results.html")
-                return render_template(
-                    "results.html",
-                    symbol=symbol,
-                    fib=fib,
-                    momentum=momentum,
-                    trend=trend,
-                    entry_exit=entry_exit,
-                    targets=targets,
-                    pattern=pattern,
-                )
-            else:
-                print("Rendering index.html with error: Invalid symbol or no data")
-                return render_template("index.html", error="Invalid symbol or no data available.")
-        except Exception as e:
-            print(f"Error in index route: {e}")
-            return render_template("index.html", error=f"Error processing request: {str(e)}")
-    print("Rendering index.html (GET)")
-    return render_template("index.html")
-
 # Suppress warnings
 warnings.filterwarnings('ignore')
 
+# Define StockAnalysisBot class first to avoid NameError
 class StockAnalysisBot:
     def __init__(self):
         self.LOOKBACK = 30
@@ -314,7 +273,7 @@ class StockAnalysisBot:
 
     def analyze_stock(self, symbol):
         """Main analysis function."""
-        print(f"\n{datetime.now()}: Analyzing {symbol}...")
+        print(f"\n{datetime.now()}: analysing {symbol}...")
         
         df_5m = self.get_data(symbol, timeframe="5m", limit=self.LOOKBACK)
         df_1d = self.get_data(symbol, timeframe="1d", days=self.HISTORICAL_DAYS)
@@ -410,6 +369,48 @@ class StockAnalysisBot:
             print(f"\nShort-term Prediction:")
             print(f"Predicted Price: ${report['trend_prediction']['predicted_price']:.2f}")
             print(f"Expected Change: {report['trend_prediction']['expected_change']:.2f}%")
+
+# Initialize Flask app and bot after class definition
+app = Flask(__name__)
+bot = StockAnalysisBot()  # Moved here to ensure StockAnalysisBot is defined
+
+# Flask route for home page and form submission
+@app.route("/", methods=["GET", "POST"])
+def index():
+    print("Received request:", request.method)
+    if request.method == "POST":
+        try:
+            symbol = request.form.get("symbol").upper().strip()
+            print(f"Symbol entered: {symbol}")
+            df = bot.get_data(symbol, timeframe="5m", days=5)
+            print(f"Data fetched: {df is not None}")
+            if df is not None and not df.empty:
+                df = bot.calculate_technical_indicators(df)
+                fib = bot.calculate_fibonacci_levels(df)
+                momentum = bot.calculate_momentum(df//*[@)
+                trend = bot.predict_trend(df) or {'predicted_price': df['close'].iloc[-1], 'expected_change': 0}
+                entry_exit = bot.calculate_entry_exit(df, fib, df["close"].iloc[-1], df["close"].std())
+                targets = bot.calculate_targets(df, fib, trend)
+                pattern = bot.generate_trade_pattern(df, targets, momentum, trend, entry_exit)
+                print("Rendering results.html")
+                return render_template(
+                    "results.html",
+                    symbol=symbol,
+                    fib=fib,
+                    momentum=momentum,
+                    trend=trend,
+                    entry_exit=entry_exit,
+                    targets=targets,
+                    pattern=pattern,
+                )
+            else:
+                print("Rendering index.html with error: Invalid symbol or no data")
+                return render_template("index.html", error="Invalid symbol or no data available.")
+        except Exception as e:
+            print(f"Error in index route: {e}")
+            return render_template("index.html", error=f"Error processing request: {str(e)}")
+    print("Rendering index.html (GET)")
+    return render_template("index.html")
 
 # Commented out console-based main function to focus on Flask
 """
