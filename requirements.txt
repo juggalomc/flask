@@ -3,5 +3,4 @@ pandas
 scikit-learn
 Flask==3.1.0
 ta
-gunicorn app:app
 gunicorn
